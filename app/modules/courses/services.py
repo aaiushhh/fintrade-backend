@@ -1,0 +1,203 @@
+"""Courses module — service layer."""
+
+from typing import List, Optional
+
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import set_committed_value
+from sqlalchemy.orm import selectinload
+
+from app.modules.courses.models import Course, CourseEnrollment, CourseModule, Lesson
+from app.utils.helpers import slugify
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+# ── Courses ──────────────────────────────────────────────────────────
+async def list_courses(
+    db: AsyncSession, skip: int = 0, limit: int = 20, published_only: bool = True
+) -> List[Course]:
+    """Return paginated list of courses."""
+    query = select(Course).offset(skip).limit(limit).order_by(Course.created_at.desc())
+    if published_only:
+        query = query.where(Course.is_published == True)  # noqa: E712
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def get_course(db: AsyncSession, course_id: int) -> Course:
+    """Get a single course with its modules and lessons."""
+    result = await db.execute(
+        select(Course)
+        .options(selectinload(Course.modules).selectinload(CourseModule.lessons))
+        .where(Course.id == course_id)
+    )
+    course = result.scalar_one_or_none()
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+    return course
+
+
+async def create_course(db: AsyncSession, data: dict, created_by: int) -> Course:
+    """Admin creates a new course."""
+    slug = slugify(data["title"])
+    # Check slug uniqueness
+    existing = await db.execute(select(Course).where(Course.slug == slug))
+    if existing.scalar_one_or_none():
+        # Append a suffix
+        import time
+        slug = f"{slug}-{int(time.time()) % 10000}"
+
+    course = Course(
+        title=data["title"],
+        slug=slug,
+        description=data.get("description"),
+        short_description=data.get("short_description"),
+        thumbnail_url=data.get("thumbnail_url"),
+        price=data.get("price", 0.0),
+        difficulty_level=data.get("difficulty_level", "beginner"),
+        duration_hours=data.get("duration_hours"),
+        is_published=data.get("is_published", False),
+        created_by=data.get("instructor_id") or created_by,
+    )
+    db.add(course)
+    await db.flush()
+    await db.refresh(course)
+    
+    set_committed_value(course, 'modules', [])
+    set_committed_value(course, 'enrollments', [])
+    
+    logger.info("course_created", course_id=course.id, title=course.title)
+    return course
+
+
+# ── Modules ──────────────────────────────────────────────────────────
+async def create_module(db: AsyncSession, data: dict) -> CourseModule:
+    """Admin creates a module for a course."""
+    # Verify course exists
+    course = await db.get(Course, data["course_id"])
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    module = CourseModule(
+        course_id=data["course_id"],
+        title=data["title"],
+        description=data.get("description"),
+        order=data.get("order", 0),
+        is_published=data.get("is_published", False),
+    )
+    db.add(module)
+    await db.flush()
+    await db.refresh(module)
+    set_committed_value(module, 'lessons', [])
+    logger.info("module_created", module_id=module.id, course_id=module.course_id)
+    return module
+
+
+# ── Lessons ──────────────────────────────────────────────────────────
+async def create_lesson(db: AsyncSession, data: dict) -> Lesson:
+    """Admin creates a lesson for a module."""
+    module = await db.get(CourseModule, data["module_id"])
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    lesson = Lesson(
+        module_id=data["module_id"],
+        title=data["title"],
+        content=data.get("content"),
+        content_type=data.get("content_type", "text"),
+        video_url=data.get("video_url"),
+        duration_minutes=data.get("duration_minutes"),
+        order=data.get("order", 0),
+        is_published=data.get("is_published", False),
+    )
+    db.add(lesson)
+    await db.flush()
+    await db.refresh(lesson)
+    logger.info("lesson_created", lesson_id=lesson.id, module_id=lesson.module_id)
+    return lesson
+
+
+# ── Enrollment ───────────────────────────────────────────────────────
+async def enroll_user(
+    db: AsyncSession,
+    user_id: int,
+    course_id: int,
+    distributor_code: Optional[str] = None,
+) -> CourseEnrollment:
+    """Enroll a student in a course, optionally with a distributor referral code."""
+    # Verify course exists and is published
+    course = await db.get(Course, course_id)
+    if course is None or not course.is_published:
+        raise HTTPException(status_code=404, detail="Course not found or not available")
+
+    # Check if already enrolled
+    existing = await db.execute(
+        select(CourseEnrollment).where(
+            CourseEnrollment.user_id == user_id,
+            CourseEnrollment.course_id == course_id,
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Already enrolled in this course")
+
+    # Distributor referral logic
+    discount_amount = 0.0
+    original_price = course.price or 0.0
+    price_paid = original_price
+    distributor_id = None
+
+    if distributor_code:
+        from app.modules.distributors.models import Distributor, StudentReferral
+
+        dist_result = await db.execute(
+            select(Distributor).where(Distributor.referral_code == distributor_code)
+        )
+        distributor = dist_result.scalar_one_or_none()
+        if distributor is None:
+            raise HTTPException(status_code=400, detail="Invalid distributor referral code")
+
+        distributor_id = distributor.id
+        if distributor.discount_percentage and distributor.discount_percentage > 0:
+            discount_amount = original_price * (distributor.discount_percentage / 100)
+            price_paid = max(original_price - discount_amount, 0.0)
+
+        # Create referral record
+        referral = StudentReferral(
+            student_id=user_id,
+            distributor_id=distributor.id,
+            course_id=course_id,
+        )
+        db.add(referral)
+
+    enrollment = CourseEnrollment(
+        user_id=user_id,
+        course_id=course_id,
+        discount_applied=round(discount_amount, 2),
+        price_paid=round(price_paid, 2),
+        distributor_id=distributor_id,
+    )
+    db.add(enrollment)
+    await db.flush()
+    await db.refresh(enrollment)
+    logger.info(
+        "user_enrolled",
+        user_id=user_id,
+        course_id=course_id,
+        distributor_code=distributor_code,
+        discount=discount_amount,
+    )
+    return enrollment
+
+
+async def get_enrolled_courses(db: AsyncSession, user_id: int) -> List[CourseEnrollment]:
+    """Get all courses a user is enrolled in."""
+    result = await db.execute(
+        select(CourseEnrollment)
+        .options(selectinload(CourseEnrollment.course))
+        .where(CourseEnrollment.user_id == user_id, CourseEnrollment.is_active == True)  # noqa: E712
+        .order_by(CourseEnrollment.enrolled_at.desc())
+    )
+    return list(result.scalars().all())

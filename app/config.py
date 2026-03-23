@@ -1,0 +1,55 @@
+"""Application configuration loaded from environment variables."""
+
+from pydantic_settings import BaseSettings
+from typing import List
+
+
+class Settings(BaseSettings):
+    """Central configuration for the LMS backend."""
+
+    # ── App ──────────────────────────────────────────────────────────
+    APP_NAME: str = "FItTrade LMS"
+    APP_VERSION: str = "1.0.0"
+    DEBUG: bool = True
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+
+    # ── Database ─────────────────────────────────────────────────────
+    DATABASE_URL: str = "postgresql+asyncpg://lms_user:lms_password@localhost:5432/lms_db"
+
+    # ── JWT ──────────────────────────────────────────────────────────
+    JWT_SECRET_KEY: str = "change-me-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
+    # ── AI / OpenAI ──────────────────────────────────────────────────
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-3.5-turbo"
+    EMBEDDING_MODEL: str = "text-embedding-ada-002"
+
+    # ── Milvus ───────────────────────────────────────────────────────
+    MILVUS_HOST: str = "localhost"
+    MILVUS_PORT: int = 19530
+    USE_MILVUS: bool = False
+
+    # ── Email ────────────────────────────────────────────────────────
+    SMTP_HOST: str = "localhost"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    EMAIL_FROM: str = "noreply@fittrade.com"
+
+    # ── Redis (optional) ─────────────────────────────────────────────
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    class Config:
+        env_file = ".env"
+        env_file_encoding = "utf-8"
+        case_sensitive = True
+
+
+settings = Settings()

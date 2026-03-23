@@ -1,0 +1,70 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: lms_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lms_db
+      POSTGRES_USER: lms_user
+      POSTGRES_PASSWORD: lms_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lms_user -d lms_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI Backend ────────────────────────────────────────────────
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: lms_backend
+    restart: unless-stopped
+    env_file:
+      - ../.env.example
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lms_user:lms_password@postgres:5432/lms_db
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ../uploads:/app/uploads
+      - ../app:/app/app
+
+  # ── Milvus (optional — uncomment to enable vector DB) ─────────────
+  # milvus:
+  #   image: milvusdb/milvus:v2.3.4
+  #   container_name: lms_milvus
+  #   restart: unless-stopped
+  #   ports:
+  #     - "19530:19530"
+  #     - "9091:9091"
+  #   environment:
+  #     ETCD_USE_EMBED: "true"
+  #     COMMON_STORAGETYPE: local
+  #   volumes:
+  #     - milvusdata:/var/lib/milvus
+
+  # ── Redis (optional — uncomment to enable caching) ────────────────
+  # redis:
+  #   image: redis:7-alpine
+  #   container_name: lms_redis
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redisdata:/data
+
+volumes:
+  pgdata:
+  # milvusdata:
+  # redisdata:
