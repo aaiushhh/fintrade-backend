@@ -9,7 +9,7 @@ from app.core.security import require_roles
 from app.db.database import get_db
 from app.modules.auth.models import User
 from app.modules.courses.schemas import CourseDetailResponse, LessonCreate, LessonResponse
-from app.modules.lectures.schemas import LectureCreate, LectureResponse
+from app.modules.lectures.schemas import LectureCreate, LectureResponse, RecordingCreate, RecordingResponse
 from app.modules.faculty import schemas, services
 
 router = APIRouter(prefix="/faculty", tags=["Faculty"])
@@ -49,8 +49,28 @@ async def create_lecture(
         return LectureResponse.model_validate(lecture)
     except Exception as e:
         from fastapi import HTTPException
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+@router.post("/lectures/{lecture_id}/complete", response_model=LectureResponse)
+async def complete_lecture(
+    lecture_id: int,
+    current_user: User = Depends(require_roles(["faculty"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Mark a lecture as completed manually."""
+    lecture = await services.complete_lecture(db, lecture_id, current_user.id)
+    return LectureResponse.model_validate(lecture)
+
+@router.post("/lectures/{lecture_id}/recordings", response_model=RecordingResponse, status_code=201)
+async def upload_recording(
+    lecture_id: int,
+    body: RecordingCreate,
+    current_user: User = Depends(require_roles(["faculty"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Save a recording to a lecture."""
+    recording = await services.add_lecture_recording(db, lecture_id, body.model_dump(), current_user.id)
+    return RecordingResponse.model_validate(recording)
 
 
 @router.get("/students", response_model=List[schemas.FacultyStudentResponse])

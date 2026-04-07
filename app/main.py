@@ -57,6 +57,15 @@ app.include_router(faculty_router)
 app.include_router(distributor_router)
 
 
+import os
+from fastapi.staticfiles import StaticFiles
+
+# Ensure uploads directory exists
+os.makedirs("uploads", exist_ok=True)
+
+# Mount static uploads
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Simple health / readiness probe."""

@@ -238,3 +238,29 @@ async def create_lecture(
         from fastapi import HTTPException
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=traceback.format_exc())
+
+# ── Media Upload ────────────────────────────────────────────────────
+import os
+import uuid
+from fastapi import UploadFile, File, HTTPException
+from app.modules.admin.schemas import MessageResponse
+
+@router.post("/upload", response_model=dict, status_code=201)
+async def upload_media(
+    file: UploadFile = File(...),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
+):
+    """Upload media file (video/audio) for courses/lessons."""
+    try:
+        os.makedirs("uploads", exist_ok=True)
+        ext = os.path.splitext(file.filename)[1]
+        unique_name = f"{uuid.uuid4()}{ext}"
+        filepath = os.path.join("uploads", unique_name)
+        
+        with open(filepath, "wb") as f:
+            content = await file.read()
+            f.write(content)
+            
+        return {"url": f"/uploads/{unique_name}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")

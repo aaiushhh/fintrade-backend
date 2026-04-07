@@ -16,6 +16,11 @@ class LectureCreate(BaseModel):
     duration_minutes: int = 60
     max_participants: int = 0
 
+class RecordingCreate(BaseModel):
+    recording_url: str = Field(..., max_length=1000)
+    duration_seconds: Optional[int] = None
+    file_size_mb: Optional[int] = None
+
 
 class RecordingResponse(BaseModel):
     id: int

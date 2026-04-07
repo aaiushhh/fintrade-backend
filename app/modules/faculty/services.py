@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.modules.courses.models import Course, CourseEnrollment, CourseModule, Lesson
-from app.modules.lectures.models import Lecture
+from app.modules.lectures.models import Lecture, LectureRecording
 from app.modules.auth.models import User
 from app.utils.logger import get_logger
 
@@ -16,11 +16,10 @@ logger = get_logger(__name__)
 
 
 async def get_faculty_courses(db: AsyncSession, faculty_id: int) -> List[Course]:
-    """Get all courses created by this faculty member."""
+    """Get all courses (faculty has access to all)."""
     result = await db.execute(
         select(Course)
         .options(selectinload(Course.modules).selectinload(CourseModule.lessons))
-        .where(Course.created_by == faculty_id)
         .order_by(Course.created_at.desc())
     )
     return list(result.scalars().all())
@@ -33,8 +32,8 @@ async def create_faculty_lesson(db: AsyncSession, data: dict, faculty_id: int) -
         raise HTTPException(status_code=404, detail="Module not found")
 
     course = await db.get(Course, module.course_id)
-    if course is None or course.created_by != faculty_id:
-        raise HTTPException(status_code=403, detail="You do not own this course")
+    if course is None:
+        raise HTTPException(status_code=404, detail="Course not found")
 
     lesson = Lesson(
         module_id=data["module_id"],
@@ -81,11 +80,46 @@ async def create_faculty_lecture(db: AsyncSession, data: dict, faculty_id: int) 
     return lecture
 
 
+async def complete_lecture(db: AsyncSession, lecture_id: int, faculty_id: int) -> Lecture:
+    """Manually mark a lecture as completed."""
+    result = await db.execute(
+        select(Lecture).options(selectinload(Lecture.recordings)).filter(Lecture.id == lecture_id)
+    )
+    lecture = result.scalar_one_or_none()
+    if not lecture:
+        raise HTTPException(status_code=404, detail="Lecture not found")
+    
+    lecture.is_completed = True
+    lecture.is_live = False
+    await db.commit()
+    await db.refresh(lecture)
+    logger.info("lecture_completed", lecture_id=lecture.id, faculty_id=faculty_id)
+    return lecture
+
+async def add_lecture_recording(db: AsyncSession, lecture_id: int, data: dict, faculty_id: int) -> LectureRecording:
+    """Add a recording to a lecture."""
+    lecture = await db.get(Lecture, lecture_id)
+    if not lecture:
+        raise HTTPException(status_code=404, detail="Lecture not found")
+        
+    recording = LectureRecording(
+        lecture_id=lecture_id,
+        recording_url=data["recording_url"],
+        duration_seconds=data.get("duration_seconds"),
+        file_size_mb=data.get("file_size_mb")
+    )
+    db.add(recording)
+    await db.commit()
+    await db.refresh(recording)
+    logger.info("lecture_recording_added", lecture_id=lecture.id, recording_id=recording.id)
+    return recording
+
+
 async def get_faculty_students(db: AsyncSession, faculty_id: int) -> List[dict]:
-    """Get students enrolled in courses created by this faculty."""
-    # Get faculty course IDs
+    """Get students enrolled in all courses."""
+    # Get all course IDs
     course_result = await db.execute(
-        select(Course.id).where(Course.created_by == faculty_id)
+        select(Course.id)
     )
     course_ids = [row[0] for row in course_result.all()]
     if not course_ids:

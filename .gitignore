@@ -1,0 +1,24 @@
+# Large temp/log files (not needed in repo)
+*.txt
+*.out
+*.log
+!requirements.txt
+docker_*.txt
+schema_out.json
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+!.env.example
+!.env.production
+
+# Uploads content
+uploads/*
+!uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
