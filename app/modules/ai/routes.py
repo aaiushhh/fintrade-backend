@@ -38,3 +38,14 @@ async def chat_history(
     return schemas.ChatHistoryResponse(
         sessions=[schemas.ChatSessionResponse.model_validate(s) for s in sessions]
     )
+
+from typing import List
+
+@router.get("/faqs", response_model=List[schemas.FAQResponse])
+async def get_faqs(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get the top dynamically generated FAQs."""
+    faqs = await services.get_faqs(db)
+    return [schemas.FAQResponse.model_validate(f) for f in faqs]

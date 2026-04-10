@@ -104,3 +104,55 @@ class ExamResultResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+# ── Phase 2 Schemas ───────────────────────────────────────────────────
+
+class CourseExamResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str] = None
+    course_id: int
+    module_id: Optional[int] = None
+    exam_type: str
+    duration_minutes: int
+    passing_score: float
+    max_attempts: int
+    is_active: bool
+
+    model_config = {"from_attributes": True}
+
+class MonthlyExamResponse(BaseModel):
+    id: int
+    course_id: int
+    month_number: int
+    exam: Optional[CourseExamResponse] = None
+
+    model_config = {"from_attributes": True}
+
+class ExamStartRequest(BaseModel):
+    device_id: str
+
+class AttemptCourseStartResponse(BaseModel):
+    attempt_id: int
+    exam_id: int
+    started_at: datetime
+    duration_minutes: int
+    device_id: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+class ExamPaymentRequest(BaseModel):
+    exam_id: int
+    amount: float = 50.0
+
+class ExamViolationRequest(BaseModel):
+    attempt_id: int
+    violation_type: str
+
+class CameraStatusRequest(BaseModel):
+    attempt_id: int
+    camera_on: bool
+
+class SessionCloseRequest(BaseModel):
+    attempt_id: int

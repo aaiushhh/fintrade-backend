@@ -348,3 +348,78 @@ async def get_exam_result(db: AsyncSession, user_id: int, exam_id: int) -> Optio
     if exam_result is None:
         raise HTTPException(status_code=404, detail="No exam result found")
     return exam_result
+
+
+# ── Phase 2: Course & Monthly Exams ───────────────────────────────────
+
+from app.modules.exams.models import (
+    CourseExam, MonthlyExam, ExamPayment, CourseExamAttempt, ExamViolation
+)
+
+async def get_monthly_exams(db: AsyncSession, user_id: int) -> List[MonthlyExam]:
+    """Fetch all monthly exams."""
+    result = await db.execute(
+        select(MonthlyExam).options(selectinload(MonthlyExam.exam))
+    )
+    return list(result.scalars().all())
+
+async def process_exam_payment(db: AsyncSession, user_id: int, exam_id: int, amount: float) -> ExamPayment:
+    """Mock payment for reattempt."""
+    payment = ExamPayment(user_id=user_id, exam_id=exam_id, amount=amount, status="paid")
+    db.add(payment)
+    await db.flush()
+    return payment
+
+async def verify_course_exam_attempt_allowed(db: AsyncSession, user_id: int, exam_id: int) -> None:
+    # Check if a failed attempt exists that requires payment
+    result = await db.execute(
+        select(CourseExamAttempt)
+        .where(CourseExamAttempt.user_id == user_id, CourseExamAttempt.exam_id == exam_id, CourseExamAttempt.is_submitted == True)
+        .order_by(CourseExamAttempt.submitted_at.desc())
+        .limit(1)
+    )
+    last_attempt = result.scalar_one_or_none()
+    if not last_attempt:
+        return # First attempt
+        
+    # Check if passed
+    if last_attempt.result and last_attempt.result.passed:
+        raise HTTPException(status_code=409, detail="Exam already passed.")
+        
+    # Check payment
+    pay_result = await db.execute(
+        select(ExamPayment).where(ExamPayment.user_id == user_id, ExamPayment.exam_id == exam_id, ExamPayment.status == "paid")
+    )
+    if not pay_result.scalars().first():
+        raise HTTPException(status_code=402, detail="Payment required to reattempt this exam.")
+
+async def start_course_exam(db: AsyncSession, user_id: int, exam_id: int, device_id: str) -> dict:
+    exam = await db.get(CourseExam, exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+        
+    await verify_course_exam_attempt_allowed(db, user_id, exam_id)
+    
+    attempt = CourseExamAttempt(user_id=user_id, exam_id=exam_id, device_id=device_id)
+    db.add(attempt)
+    await db.flush()
+    
+    return {
+        "attempt_id": attempt.id,
+        "exam_id": exam_id,
+        "started_at": attempt.started_at,
+        "duration_minutes": exam.duration_minutes,
+        "device_id": attempt.device_id
+    }
+
+async def log_exam_violation(db: AsyncSession, user_id: int, attempt_id: int, violation_type: str) -> None:
+    violation = ExamViolation(attempt_id=attempt_id, violation_type=violation_type)
+    db.add(violation)
+    await db.flush()
+
+async def close_exam_session(db: AsyncSession, user_id: int, attempt_id: int) -> None:
+    attempt = await db.get(CourseExamAttempt, attempt_id)
+    if attempt and not attempt.is_submitted and attempt.user_id == user_id:
+        attempt.is_submitted = True
+        attempt.submitted_at = datetime.now(timezone.utc)
+        await db.flush()

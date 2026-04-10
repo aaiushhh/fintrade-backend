@@ -19,6 +19,7 @@ from app.modules.ai.routes import router as ai_router
 from app.modules.admin.routes import router as admin_router
 from app.modules.faculty.routes import router as faculty_router
 from app.modules.distributors.routes import router as distributor_router
+from app.modules.learning.routes import router as learning_router
 
 
 @asynccontextmanager
@@ -55,6 +56,7 @@ app.include_router(ai_router)
 app.include_router(admin_router)
 app.include_router(faculty_router)
 app.include_router(distributor_router)
+app.include_router(learning_router)
 
 
 import os

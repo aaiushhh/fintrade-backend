@@ -37,10 +37,11 @@ class FAQEntry(Base):
     category_id = Column(Integer, ForeignKey("doubt_categories.id"), nullable=True)
     course_id = Column(Integer, ForeignKey("courses.id"), nullable=True)
     is_active = Column(Boolean, default=True)
+    frequency = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self):
-        return f"<FAQEntry {self.id}>"
+        return f"<FAQEntry {self.id} freq={self.frequency}>"
 
 
 class ChatSession(Base):

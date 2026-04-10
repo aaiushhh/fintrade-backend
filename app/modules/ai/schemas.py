@@ -39,3 +39,12 @@ class ChatSessionResponse(BaseModel):
 
 class ChatHistoryResponse(BaseModel):
     sessions: List[ChatSessionResponse] = []
+
+class FAQResponse(BaseModel):
+    id: int
+    question: str
+    answer: str
+    frequency: int
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}

@@ -36,6 +36,36 @@ async def ask_question(
         await db.flush()
         await db.refresh(session)
 
+    # 1. Simple Dynamic FAQ Match
+    from app.modules.ai.models import FAQEntry
+    # Fetch all active FAQs to do a simplistic dynamic match
+    faq_res = await db.execute(select(FAQEntry).where(FAQEntry.is_active == True))
+    all_faqs = faq_res.scalars().all()
+    
+    # Simple direct match (for a real prod app, use embeddings/vector similarity)
+    matched_faq = None
+    q_lower = question.lower().strip()
+    for f in all_faqs:
+        if q_lower == f.question.lower().strip() or f.question.lower().strip() in q_lower:
+            matched_faq = f
+            break
+            
+    if matched_faq:
+        matched_faq.frequency += 1
+        await db.flush()
+        answer = matched_faq.answer
+        sources = [{"source": f"FAQ - freq: {matched_faq.frequency}"}]
+    else:
+        # Run RAG pipeline
+        rag_result = await query_rag(question)
+        answer = rag_result["answer"]
+        sources = rag_result.get("sources", [])
+        
+        # Add new question to FAQ dynamically
+        new_faq = FAQEntry(question=question, answer=answer, frequency=1)
+        db.add(new_faq)
+        await db.flush()
+
     # Save user message
     user_msg = ChatMessage(
         session_id=session.id,
@@ -43,16 +73,12 @@ async def ask_question(
         content=question,
     )
     db.add(user_msg)
-    await db.flush()
-
-    # Run RAG pipeline
-    rag_result = await query_rag(question)
-
+    
     # Save assistant message
     assistant_msg = ChatMessage(
         session_id=session.id,
         role="assistant",
-        content=rag_result["answer"],
+        content=answer,
     )
     db.add(assistant_msg)
     await db.flush()
@@ -61,8 +87,8 @@ async def ask_question(
 
     return {
         "session_id": session.id,
-        "answer": rag_result["answer"],
-        "sources": rag_result.get("sources", []),
+        "answer": answer,
+        "sources": sources,
     }
 
 
@@ -71,7 +97,14 @@ async def get_chat_history(db: AsyncSession, user_id: int) -> List[ChatSession]:
     result = await db.execute(
         select(ChatSession)
         .options(selectinload(ChatSession.messages))
-        .where(ChatSession.user_id == user_id)
         .order_by(ChatSession.updated_at.desc())
+    )
+    return list(result.scalars().all())
+
+async def get_faqs(db: AsyncSession) -> List["FAQEntry"]:
+    from app.modules.ai.models import FAQEntry
+    """Get FAQs sorted by frequency."""
+    result = await db.execute(
+        select(FAQEntry).where(FAQEntry.is_active == True).order_by(FAQEntry.frequency.desc()).limit(20)
     )
     return list(result.scalars().all())
