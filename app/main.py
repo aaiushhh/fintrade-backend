@@ -20,6 +20,10 @@ from app.modules.admin.routes import router as admin_router
 from app.modules.faculty.routes import router as faculty_router
 from app.modules.distributors.routes import router as distributor_router
 from app.modules.learning.routes import router as learning_router
+from app.modules.certificates.routes import router as certificates_router
+from app.modules.simulator.routes import router as simulator_router
+from app.modules.placement.routes import router as placement_router
+from app.modules.feedback.routes import router as feedback_router
 
 
 @asynccontextmanager
@@ -57,6 +61,10 @@ app.include_router(admin_router)
 app.include_router(faculty_router)
 app.include_router(distributor_router)
 app.include_router(learning_router)
+app.include_router(certificates_router)
+app.include_router(simulator_router)
+app.include_router(placement_router)
+app.include_router(feedback_router)
 
 
 import os

@@ -13,6 +13,10 @@ def import_all_models():
     import app.modules.ai.models  # noqa: F401
     import app.modules.distributors.models  # noqa: F401
     import app.modules.learning.models  # noqa: F401
+    import app.modules.certificates.models  # noqa: F401
+    import app.modules.simulator.models  # noqa: F401
+    import app.modules.placement.models  # noqa: F401
+    import app.modules.feedback.models  # noqa: F401
 
 
 # Also run on import so `from app.db.base import ...` triggers discovery

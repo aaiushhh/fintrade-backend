@@ -264,3 +264,36 @@ async def upload_media(
         return {"url": f"/uploads/{unique_name}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Could not upload file: {str(e)}")
+
+
+# ── Phase 3: Advanced Dashboard Reports ─────────────────────────────
+
+@router.get("/reports", response_model=schemas.AdminReportsResponse)
+async def admin_reports(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get aggregated student analytics report."""
+    data = await services.get_admin_reports(db)
+    return schemas.AdminReportsResponse(**data)
+
+
+@router.get("/certificates", response_model=schemas.AdminCertificatesResponse)
+async def admin_certificates(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get certificate stats and recent certificates."""
+    data = await services.get_admin_certificates(db)
+    return schemas.AdminCertificatesResponse(**data)
+
+
+@router.get("/simulator", response_model=schemas.AdminSimulatorResponse)
+async def admin_simulator(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get simulator usage stats and top performers."""
+    data = await services.get_admin_simulator(db)
+    return schemas.AdminSimulatorResponse(**data)
+

@@ -184,3 +184,75 @@ async def get_distributor_stats(db: AsyncSession, distributor_id: int) -> dict:
         "total_courses_purchased": courses_count,
         "total_revenue_generated": float(revenue),
     }
+
+
+# ── Phase 3: Advanced Reports ────────────────────────────────────────
+
+from app.modules.certificates.models import Certificate
+from app.modules.simulator.models import SimulatorAccount, PerformanceMetric
+from app.modules.feedback.models import Feedback
+from app.modules.placement.models import PlacementResult
+
+
+async def get_admin_reports(db: AsyncSession) -> dict:
+    """Aggregate analytics for admin reports dashboard."""
+    total_students = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    total_courses = (await db.execute(select(func.count(Course.id)))).scalar() or 0
+    total_certs = (await db.execute(select(func.count(Certificate.id)))).scalar() or 0
+    total_sim = (await db.execute(select(func.count(SimulatorAccount.id)))).scalar() or 0
+    total_fb = (await db.execute(select(func.count(Feedback.id)))).scalar() or 0
+    avg_rating = (await db.execute(select(func.coalesce(func.avg(Feedback.rating), 0.0)))).scalar() or 0.0
+    eligible_count = (await db.execute(
+        select(func.count(PlacementResult.id)).where(PlacementResult.eligible == True)
+    )).scalar() or 0
+
+    return {
+        "total_students": total_students,
+        "total_courses": total_courses,
+        "total_certificates": total_certs,
+        "total_simulator_accounts": total_sim,
+        "total_feedback": total_fb,
+        "avg_feedback_rating": round(float(avg_rating), 2),
+        "total_placements_eligible": eligible_count,
+    }
+
+
+async def get_admin_certificates(db: AsyncSession) -> dict:
+    """Fetch certificate stats and list for admin."""
+    total = (await db.execute(select(func.count(Certificate.id)))).scalar() or 0
+    result = await db.execute(
+        select(Certificate).order_by(Certificate.issued_at.desc()).limit(50)
+    )
+    certs = list(result.scalars().all())
+    return {"total": total, "certificates": certs}
+
+
+async def get_admin_simulator(db: AsyncSession) -> dict:
+    """Fetch simulator usage stats and top performers."""
+    total_accounts = (await db.execute(select(func.count(SimulatorAccount.id)))).scalar() or 0
+
+    result = await db.execute(
+        select(
+            SimulatorAccount.user_id,
+            SimulatorAccount.balance,
+            PerformanceMetric.total_pnl,
+            PerformanceMetric.win_rate,
+            PerformanceMetric.total_trades,
+        )
+        .join(PerformanceMetric, PerformanceMetric.account_id == SimulatorAccount.id)
+        .order_by(PerformanceMetric.total_pnl.desc())
+        .limit(10)
+    )
+    rows = result.all()
+    top_performers = [
+        {
+            "user_id": r[0],
+            "balance": r[1],
+            "total_pnl": r[2] or 0,
+            "win_rate": r[3] or 0,
+            "total_trades": r[4] or 0,
+        }
+        for r in rows
+    ]
+    return {"total_accounts": total_accounts, "top_performers": top_performers}
+

@@ -423,3 +423,42 @@ async def close_exam_session(db: AsyncSession, user_id: int, attempt_id: int) ->
         attempt.is_submitted = True
         attempt.submitted_at = datetime.now(timezone.utc)
         await db.flush()
+
+
+# ── Skill-Based Result Analysis ──────────────────────────────────────
+
+from app.modules.exams.models import CategoryScore
+
+async def get_skill_analysis(db: AsyncSession, user_id: int) -> dict:
+    """Analyse user's category scores and return strong/weak areas."""
+    result = await db.execute(
+        select(CategoryScore).where(CategoryScore.user_id == user_id)
+    )
+    scores = list(result.scalars().all())
+
+    if not scores:
+        return {"strong_areas": [], "weak_areas": [], "suggestions": ["Complete exams to see your skill analysis."]}
+
+    scored = []
+    for s in scores:
+        pct = (s.score / s.max_score * 100) if s.max_score > 0 else 0
+        scored.append({
+            "category": s.category,
+            "score": s.score,
+            "max_score": s.max_score,
+            "percentage": round(pct, 1),
+        })
+
+    scored.sort(key=lambda x: x["percentage"], reverse=True)
+
+    strong = [s for s in scored if s["percentage"] >= 70]
+    weak = [s for s in scored if s["percentage"] < 70]
+
+    suggestions = []
+    for w in weak:
+        suggestions.append(f"Improve your {w['category']} skills — currently at {w['percentage']}%.")
+    if not weak:
+        suggestions.append("Great job! You're performing well across all categories.")
+
+    return {"strong_areas": strong, "weak_areas": weak, "suggestions": suggestions}
+

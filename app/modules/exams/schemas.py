@@ -156,3 +156,21 @@ class CameraStatusRequest(BaseModel):
 
 class SessionCloseRequest(BaseModel):
     attempt_id: int
+
+
+# ── Skill Analysis ───────────────────────────────────────────────────
+
+class CategoryScoreResponse(BaseModel):
+    category: str
+    score: float
+    max_score: float
+    percentage: float
+
+    model_config = {"from_attributes": True}
+
+
+class SkillAnalysisResponse(BaseModel):
+    strong_areas: list[CategoryScoreResponse]
+    weak_areas: list[CategoryScoreResponse]
+    suggestions: list[str]
+

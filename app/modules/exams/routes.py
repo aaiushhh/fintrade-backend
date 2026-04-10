@@ -148,3 +148,16 @@ async def session_close(
 ):
     await services.close_exam_session(db, current_user.id, req.attempt_id)
     return schemas.MessageResponse(message="Session closed")
+
+
+# ── Skill-Based Result Analysis ──────────────────────────────────────
+
+@router.get("/results/analysis", response_model=schemas.SkillAnalysisResponse)
+async def get_skill_analysis(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get skill-based result analysis with strong/weak areas."""
+    data = await services.get_skill_analysis(db, current_user.id)
+    return schemas.SkillAnalysisResponse(**data)
+

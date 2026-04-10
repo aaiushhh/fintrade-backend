@@ -66,3 +66,44 @@ class AdminDistributorStatsResponse(BaseModel):
     total_students_referred: int
     total_courses_purchased: int
     total_revenue_generated: float
+
+
+# ── Phase 3: Admin Report Schemas ────────────────────────────────────
+
+class AdminReportsResponse(BaseModel):
+    total_students: int
+    total_courses: int
+    total_certificates: int
+    total_simulator_accounts: int
+    total_feedback: int
+    avg_feedback_rating: float
+    total_placements_eligible: int
+
+
+class AdminCertificateItem(BaseModel):
+    id: int
+    user_id: int
+    course_id: int
+    unique_code: str
+    issued_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AdminCertificatesResponse(BaseModel):
+    total: int
+    certificates: List[AdminCertificateItem]
+
+
+class AdminSimulatorItem(BaseModel):
+    user_id: int
+    balance: float
+    total_pnl: float
+    win_rate: float
+    total_trades: int
+
+
+class AdminSimulatorResponse(BaseModel):
+    total_accounts: int
+    top_performers: List[AdminSimulatorItem]
+

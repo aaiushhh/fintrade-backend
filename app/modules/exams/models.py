@@ -271,3 +271,22 @@ class ExamViolation(Base):
     
     # relationships
     attempt = relationship("CourseExamAttempt", back_populates="violations")
+
+
+# --- SKILL-BASED RESULT ANALYSIS ---
+
+class CategoryScore(Base):
+    """Per-category score breakdown for skill analysis."""
+    __tablename__ = "category_scores"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    exam_id = Column(Integer, ForeignKey("course_exams.id", ondelete="CASCADE"), nullable=True)
+    category = Column(String(100), nullable=False)  # e.g. "Technical Analysis", "Risk Management"
+    score = Column(Float, default=0.0)
+    max_score = Column(Float, default=100.0)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return f"<CategoryScore user={self.user_id} category={self.category} score={self.score}>"
+
