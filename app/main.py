@@ -24,6 +24,7 @@ from app.modules.certificates.routes import router as certificates_router
 from app.modules.simulator.routes import router as simulator_router
 from app.modules.placement.routes import router as placement_router
 from app.modules.feedback.routes import router as feedback_router
+from app.modules.dashboard.routes import router as dashboard_router
 
 
 @asynccontextmanager
@@ -65,6 +66,7 @@ app.include_router(certificates_router)
 app.include_router(simulator_router)
 app.include_router(placement_router)
 app.include_router(feedback_router)
+app.include_router(dashboard_router)
 
 
 import os

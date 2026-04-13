@@ -1,0 +1,1 @@
+# Dashboard module (announcements + advertisements)

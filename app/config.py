@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     # ── Redis (optional) ─────────────────────────────────────────────
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # ── Admin seed credentials ───────────────────────────────────────
+    ADMIN_EMAIL: str = "admin@platform.com"
+    ADMIN_PASSWORD: str = "admin123!"
+    ADMIN_FULL_NAME: str = "Platform Admin"
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]

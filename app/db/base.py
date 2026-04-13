@@ -17,6 +17,7 @@ def import_all_models():
     import app.modules.simulator.models  # noqa: F401
     import app.modules.placement.models  # noqa: F401
     import app.modules.feedback.models  # noqa: F401
+    import app.modules.dashboard.models  # noqa: F401
 
 
 # Also run on import so `from app.db.base import ...` triggers discovery

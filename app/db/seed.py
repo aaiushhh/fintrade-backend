@@ -10,15 +10,16 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspa
 from app.db.database import AsyncSessionLocal, init_db
 from app.modules.auth.models import Role, User
 from app.core.security import hash_password
+from app.config import settings
 from sqlalchemy import select
 
 
 ROLES = ["admin", "faculty", "student", "distributor"]
 
 DEFAULT_ADMIN = {
-    "email": "admin@platform.com",
-    "full_name": "Platform Admin",
-    "password": "admin123!",
+    "email": settings.ADMIN_EMAIL,
+    "full_name": settings.ADMIN_FULL_NAME,
+    "password": settings.ADMIN_PASSWORD,
 }
 
 
