@@ -29,7 +29,27 @@ class EntranceExamCreate(BaseModel):
     duration_minutes: int = 60
     passing_score: float = 60.0
     is_active: bool = True
+    is_active: bool = True
     questions: List[ExamQuestionCreate] = []
+
+class CourseExamCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    course_id: int
+    module_id: Optional[int] = None
+    exam_type: str = "course_final"
+    duration_minutes: int = 60
+    passing_score: float = 60.0
+    max_attempts: int = 3
+    is_active: bool = True
+    questions: List[ExamQuestionCreate] = []
+
+class ExamUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    passing_score: Optional[float] = None
+    is_active: Optional[bool] = None
 
 
 # ── Response schemas ─────────────────────────────────────────────────

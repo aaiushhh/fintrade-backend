@@ -104,6 +104,70 @@ async def create_exam(db: AsyncSession, data: dict) -> EntranceExam:
     logger.info("exam_created", exam_id=exam.id, title=exam.title)
     return exam
 
+async def create_course_exam(db: AsyncSession, data: dict) -> "CourseExam":
+    from app.modules.exams.models import CourseExam, CourseExamQuestion, CourseExamOption
+    exam = CourseExam(
+        title=data["title"],
+        description=data.get("description"),
+        course_id=data["course_id"],
+        module_id=data.get("module_id"),
+        exam_type=data.get("exam_type", "course_final"),
+        duration_minutes=data.get("duration_minutes", 60),
+        passing_score=data.get("passing_score", 60.0),
+        max_attempts=data.get("max_attempts", 3),
+        is_active=data.get("is_active", True),
+    )
+    db.add(exam)
+    await db.flush()
+
+    for q_data in data.get("questions", []):
+        question = CourseExamQuestion(
+            exam_id=exam.id,
+            question_text=q_data["question_text"],
+            question_type=q_data.get("question_type", "mcq"),
+            marks=q_data.get("marks", 1.0),
+            order=q_data.get("order", 0),
+            explanation=q_data.get("explanation"),
+        )
+        db.add(question)
+        await db.flush()
+
+        for opt_data in q_data.get("options", []):
+            option = CourseExamOption(
+                question_id=question.id,
+                option_text=opt_data["option_text"],
+                is_correct=opt_data.get("is_correct", False),
+                order=opt_data.get("order", 0),
+            )
+            db.add(option)
+
+    await db.flush()
+    await db.refresh(exam)
+    logger.info("course_exam_created", exam_id=exam.id, title=exam.title)
+    return exam
+
+async def update_exam(db: AsyncSession, exam_id: int, data: dict, is_course_exam: bool = False):
+    from app.modules.exams.models import EntranceExam, CourseExam
+    model = CourseExam if is_course_exam else EntranceExam
+    exam = await db.get(model, exam_id)
+    if not exam:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    
+    if data.get("title") is not None:
+        exam.title = data["title"]
+    if data.get("description") is not None:
+        exam.description = data["description"]
+    if data.get("duration_minutes") is not None:
+        exam.duration_minutes = data["duration_minutes"]
+    if data.get("passing_score") is not None:
+        exam.passing_score = data["passing_score"]
+    if data.get("is_active") is not None:
+        exam.is_active = data["is_active"]
+        
+    await db.flush()
+    await db.refresh(exam)
+    return exam
+
 
 async def add_questions_to_exam(db: AsyncSession, exam_id: int, questions_data: list) -> None:
     """Add questions to an existing exam (admin)."""

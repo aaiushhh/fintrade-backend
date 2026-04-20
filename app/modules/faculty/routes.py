@@ -81,3 +81,13 @@ async def list_students(
     """List students enrolled in courses created by this faculty."""
     students = await services.get_faculty_students(db, current_user.id)
     return [schemas.FacultyStudentResponse(**s) for s in students]
+
+
+@router.get("/reports", response_model=schemas.FacultyReportsResponse)
+async def get_faculty_reports(
+    current_user: User = Depends(require_roles(["faculty"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get aggregated performance reports for the faculty member's courses and students."""
+    reports = await services.get_faculty_reports(db, current_user.id)
+    return schemas.FacultyReportsResponse(**reports)

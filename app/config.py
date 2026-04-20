@@ -38,6 +38,21 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-3.5-turbo"
     EMBEDDING_MODEL: str = "text-embedding-ada-002"
 
+    # ── Payment Gateways (Future Compatibility) ──────────────────────
+    CASHFREE_APP_ID: str = ""
+    CASHFREE_SECRET_KEY: str = ""
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    ACTIVE_PAYMENT_GATEWAY: str = "cashfree"  # Or razorpay
+
+    # ── TradingView API ──────────────────────────────────────────────
+    TRADINGVIEW_WEBHOOK_SECRET: str = ""
+    TRADINGVIEW_API_KEY: str = ""
+
+    # ── WhatsApp / SMS Reminders ─────────────────────────────────────
+    WHATSAPP_API_TOKEN: str = ""
+    WHATSAPP_PHONE_NUMBER_ID: str = ""
+
     # ── Milvus ───────────────────────────────────────────────────────
     MILVUS_HOST: str = "localhost"
     MILVUS_PORT: int = 19530

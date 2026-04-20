@@ -22,3 +22,30 @@ class FacultyStudentResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+class TrendData(BaseModel):
+    month: str
+    avgScore: int
+    passRate: int
+
+class TopicData(BaseModel):
+    topic: str
+    struggles: int
+
+class ModuleData(BaseModel):
+    module: str
+    completion: int
+
+class DistributionData(BaseModel):
+    category: str
+    value: int
+
+class FacultyReportsResponse(BaseModel):
+    avg_class_score: int
+    pass_rate: int
+    completion_rate: int
+    at_risk_students: int
+    performance_trend: List[TrendData]
+    weak_topics: List[TopicData]
+    module_completion: List[ModuleData]
+    student_distribution: List[DistributionData]

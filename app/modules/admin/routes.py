@@ -185,6 +185,74 @@ async def create_exam(
     exam = await exam_services.create_exam(db, body.model_dump())
     return exam_schemas.EntranceExamResponse.model_validate(exam)
 
+@router.post("/exams/course-create", response_model=exam_schemas.CourseExamResponse, status_code=201)
+async def create_course_exam(
+    body: exam_schemas.CourseExamCreate,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Create a course or module exam with questions (admin only)."""
+    exam = await exam_services.create_course_exam(db, body.model_dump())
+    return exam_schemas.CourseExamResponse.model_validate(exam)
+
+@router.put("/exams/{exam_id}", response_model=exam_schemas.EntranceExamResponse)
+async def update_entrance_exam(
+    exam_id: int,
+    body: exam_schemas.ExamUpdate,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update entrance exam metadata."""
+    exam = await exam_services.update_exam(db, exam_id, body.model_dump(exclude_unset=True), is_course_exam=False)
+    return exam_schemas.EntranceExamResponse.model_validate(exam)
+
+@router.put("/course-exams/{exam_id}", response_model=exam_schemas.CourseExamResponse)
+async def update_course_exam(
+    exam_id: int,
+    body: exam_schemas.ExamUpdate,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update course exam metadata."""
+    exam = await exam_services.update_exam(db, exam_id, body.model_dump(exclude_unset=True), is_course_exam=True)
+    return exam_schemas.CourseExamResponse.model_validate(exam)
+
+@router.get("/exams/all", response_model=dict)
+async def list_all_exams(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """List all exams (both entrance and course exams) with question counts for admin."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+    from app.modules.exams.models import EntranceExam, CourseExam
+
+    # Entrance Exams
+    req1 = await db.execute(select(EntranceExam).options(selectinload(EntranceExam.questions)).order_by(EntranceExam.created_at.desc()))
+    entrance_exams = req1.scalars().all()
+    
+    # Course Exams
+    req2 = await db.execute(select(CourseExam).options(selectinload(CourseExam.questions)).order_by(CourseExam.created_at.desc()))
+    course_exams = req2.scalars().all()
+
+    return {
+        "entrance_exams": [
+            {
+                "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
+                "passing_score": e.passing_score, "is_active": e.is_active, 
+                "questions_count": len(e.questions), "type": "entrance"
+            } for e in entrance_exams
+        ],
+        "course_exams": [
+            {
+                "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
+                "passing_score": e.passing_score, "is_active": e.is_active, 
+                "questions_count": len(e.questions), "type": e.exam_type,
+                "course_id": e.course_id, "module_id": e.module_id
+            } for e in course_exams
+        ]
+    }
+
 
 @router.post("/exams/questions", response_model=schemas.MessageResponse, status_code=201)
 async def add_questions(
