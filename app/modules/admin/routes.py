@@ -290,6 +290,63 @@ async def list_all_offers(
     return [offer_schemas.OfferResponse.model_validate(o) for o in offers]
 
 
+@router.put("/offers/{offer_id}", response_model=offer_schemas.OfferResponse)
+async def update_offer(
+    offer_id: int,
+    body: offer_schemas.OfferCreate,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Update an existing offer/coupon (admin only)."""
+    offer = await offer_services.update_offer(db, offer_id, body.model_dump(exclude_unset=True))
+    return offer_schemas.OfferResponse.model_validate(offer)
+
+
+@router.delete("/offers/{offer_id}", response_model=schemas.MessageResponse)
+async def delete_offer(
+    offer_id: int,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Delete an offer/coupon (admin only)."""
+    await offer_services.delete_offer(db, offer_id)
+    return schemas.MessageResponse(message="Offer deleted successfully")
+
+
+@router.put("/offers/{offer_id}/toggle", response_model=offer_schemas.OfferResponse)
+async def toggle_offer(
+    offer_id: int,
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Toggle offer active/inactive status (admin only)."""
+    offer = await offer_services.toggle_offer(db, offer_id)
+    return offer_schemas.OfferResponse.model_validate(offer)
+
+
+@router.get("/offers/stats", response_model=dict)
+async def offer_stats(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get coupon/offer usage statistics (admin only)."""
+    return await offer_services.get_offer_stats(db)
+
+
+@router.get("/revenue/stats", response_model=dict)
+async def revenue_stats(
+    _admin: User = Depends(require_roles(["admin"])),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get revenue statistics (hardcoded for now, Finance/Super Admin only)."""
+    return {
+        "total_revenue": "₹2.45Cr",
+        "monthly_revenue": "₹24.5L",
+        "active_coupons": (await offer_services.get_offer_stats(db))["active_coupons"],
+        "total_usage": (await offer_services.get_offer_stats(db))["total_usage"],
+    }
+
+
 # ── Lecture management ──────────────────────────────────────────────
 @router.post("/lectures", response_model=lecture_schemas.LectureResponse, status_code=201)
 async def create_lecture(

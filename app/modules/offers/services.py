@@ -118,3 +118,65 @@ async def apply_offer(db: AsyncSession, user_id: int, code: str, course_id: int)
         "discount_applied": round(discount, 2),
         "message": f"Offer '{offer.code}' applied successfully",
     }
+
+
+async def update_offer(db: AsyncSession, offer_id: int, data: dict) -> Offer:
+    """Update an existing offer/coupon."""
+    result = await db.execute(select(Offer).where(Offer.id == offer_id))
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    for key, value in data.items():
+        if value is not None and hasattr(offer, key):
+            setattr(offer, key, value)
+
+    await db.commit()
+    await db.refresh(offer)
+    logger.info("offer_updated", offer_id=offer.id)
+    return offer
+
+
+async def delete_offer(db: AsyncSession, offer_id: int) -> None:
+    """Delete an offer/coupon."""
+    result = await db.execute(select(Offer).where(Offer.id == offer_id))
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    await db.delete(offer)
+    await db.commit()
+    logger.info("offer_deleted", offer_id=offer_id)
+
+
+async def toggle_offer(db: AsyncSession, offer_id: int) -> Offer:
+    """Toggle an offer's active status."""
+    result = await db.execute(select(Offer).where(Offer.id == offer_id))
+    offer = result.scalar_one_or_none()
+    if not offer:
+        raise HTTPException(status_code=404, detail="Offer not found")
+
+    offer.is_active = not offer.is_active
+    await db.commit()
+    await db.refresh(offer)
+    logger.info("offer_toggled", offer_id=offer.id, is_active=offer.is_active)
+    return offer
+
+
+async def get_offer_stats(db: AsyncSession) -> dict:
+    """Get coupon/offer usage statistics."""
+    result = await db.execute(select(Offer))
+    offers = list(result.scalars().all())
+
+    active = [o for o in offers if o.is_active]
+    total_usage = sum(o.current_redemptions for o in offers)
+
+    return {
+        "total_coupons": len(offers),
+        "active_coupons": len(active),
+        "total_usage": total_usage,
+        "expired_coupons": sum(
+            1 for o in offers
+            if o.valid_until and o.valid_until < datetime.now(timezone.utc)
+        ),
+    }
