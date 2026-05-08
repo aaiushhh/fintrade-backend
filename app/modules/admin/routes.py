@@ -141,6 +141,17 @@ async def distributor_stats(
 
 
 # ── Course management ────────────────────────────────────────────────
+@router.get("/courses", response_model=List[course_schemas.CourseListResponse])
+async def admin_list_courses(
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
+    db: AsyncSession = Depends(get_db),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, le=100),
+):
+    """List all courses including drafts (admin/faculty only)."""
+    courses = await course_services.list_courses(db, skip=skip, limit=limit, published_only=False)
+    return [course_schemas.CourseListResponse.model_validate(c) for c in courses]
+
 @router.post("/courses", response_model=course_schemas.CourseDetailResponse, status_code=201)
 async def create_course(
     body: course_schemas.CourseCreate,
