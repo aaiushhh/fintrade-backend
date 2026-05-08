@@ -178,7 +178,7 @@ async def create_lesson(
 @router.post("/exams/create", response_model=exam_schemas.EntranceExamResponse, status_code=201)
 async def create_exam(
     body: exam_schemas.EntranceExamCreate,
-    _admin: User = Depends(require_roles(["admin"])),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
     db: AsyncSession = Depends(get_db),
 ):
     """Create an entrance exam with questions (admin only)."""
@@ -188,7 +188,7 @@ async def create_exam(
 @router.post("/exams/course-create", response_model=exam_schemas.CourseExamResponse, status_code=201)
 async def create_course_exam(
     body: exam_schemas.CourseExamCreate,
-    _admin: User = Depends(require_roles(["admin"])),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
     db: AsyncSession = Depends(get_db),
 ):
     """Create a course or module exam with questions (admin only)."""
@@ -199,7 +199,7 @@ async def create_course_exam(
 async def update_entrance_exam(
     exam_id: int,
     body: exam_schemas.ExamUpdate,
-    _admin: User = Depends(require_roles(["admin"])),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
     db: AsyncSession = Depends(get_db),
 ):
     """Update entrance exam metadata."""
@@ -210,7 +210,7 @@ async def update_entrance_exam(
 async def update_course_exam(
     exam_id: int,
     body: exam_schemas.ExamUpdate,
-    _admin: User = Depends(require_roles(["admin"])),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
     db: AsyncSession = Depends(get_db),
 ):
     """Update course exam metadata."""
@@ -219,7 +219,7 @@ async def update_course_exam(
 
 @router.get("/exams/all", response_model=dict)
 async def list_all_exams(
-    _admin: User = Depends(require_roles(["admin"])),
+    _admin: User = Depends(require_roles(["admin", "faculty"])),
     db: AsyncSession = Depends(get_db),
 ):
     """List all exams (both entrance and course exams) with question counts for admin."""
