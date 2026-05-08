@@ -23,10 +23,11 @@ DEFAULT_ADMIN = {
 }
 
 
-async def seed():
+async def seed(skip_init_db: bool = False):
     """Seed the database with default roles and admin account."""
-    # Ensure tables exist
-    await init_db()
+    # Ensure tables exist (skip if caller already did this)
+    if not skip_init_db:
+        await init_db()
 
     async with AsyncSessionLocal() as db:
         try:

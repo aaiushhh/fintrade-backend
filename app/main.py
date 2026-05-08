@@ -36,6 +36,15 @@ async def lifespan(app: FastAPI):
     """Startup / shutdown lifecycle."""
     setup_logging(debug=settings.DEBUG)
     await init_db()
+
+    # Seed default roles and admin user (idempotent — skips if already present)
+    from app.db.seed import seed
+    try:
+        await seed(skip_init_db=True)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Seed skipped or failed: {e}")
+
     yield
 
 
