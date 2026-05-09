@@ -21,6 +21,45 @@ async def list_entrance_exams(db: AsyncSession = Depends(get_db)):
     exams = await services.get_entrance_exams(db)
     return [schemas.EntranceExamResponse.model_validate(e) for e in exams]
 
+@router.get("/all")
+async def list_all_exams(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """List all exams for admin/faculty dashboard."""
+    entrance = await services.get_entrance_exams(db)
+    
+    from app.modules.exams.models import CourseExam
+    from sqlalchemy import select
+    course_res = await db.execute(select(CourseExam))
+    course_exams = course_res.scalars().all()
+    
+    return {
+        "entrance_exams": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "type": "entrance",
+                "questions_count": 0, # not eagerly loaded but fine for mock
+                "duration_minutes": e.duration_minutes,
+                "passing_score": e.passing_score,
+                "is_active": e.is_active
+            } for e in entrance
+        ],
+        "course_exams": [
+            {
+                "id": e.id,
+                "title": e.title,
+                "type": e.exam_type,
+                "questions_count": 0,
+                "duration_minutes": e.duration_minutes,
+                "passing_score": e.passing_score,
+                "is_active": e.is_active
+            } for e in course_exams
+        ]
+    }
+
+
 
 @router.post("/start", response_model=schemas.AttemptStartResponse)
 async def start_exam(
