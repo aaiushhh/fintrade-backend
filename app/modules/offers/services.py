@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.courses.models import Course
 from app.modules.offers.models import Offer, OfferRedemption
+from app.modules.distributors.models import Distributor
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -60,32 +61,40 @@ async def apply_offer(db: AsyncSession, user_id: int, code: str, course_id: int)
     # Find the offer
     result = await db.execute(select(Offer).where(Offer.code == code))
     offer = result.scalar_one_or_none()
+    
+    # If not an offer, check if it's a distributor referral code
+    distributor = None
     if offer is None:
-        raise HTTPException(status_code=404, detail="Invalid offer code")
+        dist_result = await db.execute(select(Distributor).where(Distributor.referral_code == code))
+        distributor = dist_result.scalar_one_or_none()
+        
+        if distributor is None:
+            raise HTTPException(status_code=404, detail="Invalid offer or referral code")
 
-    if not offer.is_active:
-        raise HTTPException(status_code=400, detail="Offer is no longer active")
+    if offer:
+        if not offer.is_active:
+            raise HTTPException(status_code=400, detail="Offer is no longer active")
 
-    now = datetime.now(timezone.utc)
-    if offer.valid_until and now > offer.valid_until:
-        raise HTTPException(status_code=400, detail="Offer has expired")
+        now = datetime.now(timezone.utc)
+        if offer.valid_until and now > offer.valid_until:
+            raise HTTPException(status_code=400, detail="Offer has expired")
 
-    if offer.max_redemptions > 0 and offer.current_redemptions >= offer.max_redemptions:
-        raise HTTPException(status_code=400, detail="Offer redemption limit reached")
+        if offer.max_redemptions > 0 and offer.current_redemptions >= offer.max_redemptions:
+            raise HTTPException(status_code=400, detail="Offer redemption limit reached")
 
-    # Course-specific offer check
-    if offer.course_id and offer.course_id != course_id:
-        raise HTTPException(status_code=400, detail="Offer is not valid for this course")
+        # Course-specific offer check
+        if offer.course_id and offer.course_id != course_id:
+            raise HTTPException(status_code=400, detail="Offer is not valid for this course")
 
-    # Check if user already redeemed this offer
-    redeemed = await db.execute(
-        select(OfferRedemption).where(
-            OfferRedemption.offer_id == offer.id,
-            OfferRedemption.user_id == user_id,
+        # Check if user already redeemed this offer
+        redeemed = await db.execute(
+            select(OfferRedemption).where(
+                OfferRedemption.offer_id == offer.id,
+                OfferRedemption.user_id == user_id,
+            )
         )
-    )
-    if redeemed.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="You have already redeemed this offer")
+        if redeemed.scalar_one_or_none():
+            raise HTTPException(status_code=409, detail="You have already redeemed this offer")
 
     # Get course price
     course = await db.get(Course, course_id)
@@ -93,31 +102,53 @@ async def apply_offer(db: AsyncSession, user_id: int, code: str, course_id: int)
         raise HTTPException(status_code=404, detail="Course not found")
 
     original_price = course.price or 0.0
-    if offer.discount_type == "percentage":
-        discount = original_price * (offer.discount_value / 100)
-    else:
-        discount = offer.discount_value
+    discount = 0.0
+
+    if offer:
+        if offer.discount_type == "percentage":
+            discount = original_price * (offer.discount_value / 100)
+        else:
+            discount = offer.discount_value
+    elif distributor:
+        # Distributors have a default discount percentage
+        discount_percentage = distributor.discount_percentage or 10.0 # Default to 10% if 0
+        if discount_percentage == 0.0:
+            discount_percentage = 10.0
+        discount = original_price * (discount_percentage / 100)
+
     discounted_price = max(original_price - discount, 0.0)
 
-    # Record redemption
-    redemption = OfferRedemption(
-        offer_id=offer.id,
-        user_id=user_id,
-        original_price=original_price,
-        discounted_price=discounted_price,
-    )
-    db.add(redemption)
-    offer.current_redemptions += 1
-    await db.flush()
+    # Record redemption if it's an offer
+    if offer:
+        redemption = OfferRedemption(
+            offer_id=offer.id,
+            user_id=user_id,
+            original_price=original_price,
+            discounted_price=discounted_price,
+        )
+        db.add(redemption)
+        offer.current_redemptions += 1
+        await db.flush()
+        logger.info("offer_applied", user_id=user_id, offer_id=offer.id, discount=discount)
+        return {
+            "offer_id": offer.id,
+            "original_price": original_price,
+            "discounted_price": round(discounted_price, 2),
+            "discount_applied": round(discount, 2),
+            "message": f"Offer '{offer.code}' applied successfully",
+        }
+    else:
+        # Note: Actual distributor referral is recorded during the /enroll endpoint
+        logger.info("distributor_referral_applied", user_id=user_id, distributor_id=distributor.id, discount=discount)
+        return {
+            "offer_id": 0, # Or some dummy ID
+            "original_price": original_price,
+            "discounted_price": round(discounted_price, 2),
+            "discount_applied": round(discount, 2),
+            "message": f"Distributor referral '{distributor.referral_code}' applied successfully",
+        }
 
-    logger.info("offer_applied", user_id=user_id, offer_id=offer.id, discount=discount)
-    return {
-        "offer_id": offer.id,
-        "original_price": original_price,
-        "discounted_price": round(discounted_price, 2),
-        "discount_applied": round(discount, 2),
-        "message": f"Offer '{offer.code}' applied successfully",
-    }
+
 
 
 async def update_offer(db: AsyncSession, offer_id: int, data: dict) -> Offer:

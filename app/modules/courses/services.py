@@ -171,26 +171,39 @@ async def enroll_user(
 
     if distributor_code:
         from app.modules.distributors.models import Distributor, StudentReferral
+        from app.modules.offers.models import Offer
 
-        dist_result = await db.execute(
-            select(Distributor).where(Distributor.referral_code == distributor_code)
-        )
-        distributor = dist_result.scalar_one_or_none()
-        if distributor is None:
-            raise HTTPException(status_code=400, detail="Invalid distributor referral code")
-
-        distributor_id = distributor.id
-        if distributor.discount_percentage and distributor.discount_percentage > 0:
-            discount_amount = original_price * (distributor.discount_percentage / 100)
+        # Check if it's an offer first
+        offer_result = await db.execute(select(Offer).where(Offer.code == distributor_code))
+        offer = offer_result.scalar_one_or_none()
+        
+        if offer:
+            if offer.discount_type == "percentage":
+                discount_amount = original_price * (offer.discount_value / 100)
+            else:
+                discount_amount = offer.discount_value
             price_paid = max(original_price - discount_amount, 0.0)
+            # Note: /offers/apply already recorded the OfferRedemption
+        else:
+            dist_result = await db.execute(
+                select(Distributor).where(Distributor.referral_code == distributor_code)
+            )
+            distributor = dist_result.scalar_one_or_none()
+            if distributor is None:
+                raise HTTPException(status_code=400, detail="Invalid offer or distributor referral code")
 
-        # Create referral record
-        referral = StudentReferral(
-            student_id=user_id,
-            distributor_id=distributor.id,
-            course_id=course_id,
-        )
-        db.add(referral)
+            distributor_id = distributor.id
+            if distributor.discount_percentage and distributor.discount_percentage > 0:
+                discount_amount = original_price * (distributor.discount_percentage / 100)
+                price_paid = max(original_price - discount_amount, 0.0)
+
+            # Create referral record
+            referral = StudentReferral(
+                student_id=user_id,
+                distributor_id=distributor.id,
+                course_id=course_id,
+            )
+            db.add(referral)
 
     enrollment = CourseEnrollment(
         user_id=user_id,
