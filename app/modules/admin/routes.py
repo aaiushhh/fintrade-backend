@@ -290,32 +290,46 @@ async def list_all_exams(
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
     from app.modules.exams.models import EntranceExam, CourseExam
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Entrance Exams
-    req1 = await db.execute(select(EntranceExam).options(selectinload(EntranceExam.questions)).order_by(EntranceExam.created_at.desc()))
-    entrance_exams = req1.scalars().all()
-    
-    # Course Exams
-    req2 = await db.execute(select(CourseExam).options(selectinload(CourseExam.questions)).order_by(CourseExam.created_at.desc()))
-    course_exams = req2.scalars().all()
+    try:
+        # Entrance Exams
+        req1 = await db.execute(
+            select(EntranceExam)
+            .options(selectinload(EntranceExam.questions))
+            .order_by(EntranceExam.created_at.desc())
+        )
+        entrance_exams = req1.scalars().all()
+        
+        # Course Exams
+        req2 = await db.execute(
+            select(CourseExam)
+            .options(selectinload(CourseExam.questions))
+            .order_by(CourseExam.created_at.desc())
+        )
+        course_exams = req2.scalars().all()
 
-    return {
-        "entrance_exams": [
-            {
-                "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
-                "passing_score": e.passing_score, "is_active": e.is_active, 
-                "questions_count": len(e.questions), "type": "entrance"
-            } for e in entrance_exams
-        ],
-        "course_exams": [
-            {
-                "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
-                "passing_score": e.passing_score, "is_active": e.is_active, 
-                "questions_count": len(e.questions), "type": e.exam_type,
-                "course_id": e.course_id, "module_id": e.module_id
-            } for e in course_exams
-        ]
-    }
+        return {
+            "entrance_exams": [
+                {
+                    "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
+                    "passing_score": e.passing_score, "is_active": e.is_active, 
+                    "questions_count": len(e.questions), "type": "entrance"
+                } for e in entrance_exams
+            ],
+            "course_exams": [
+                {
+                    "id": e.id, "title": e.title, "duration_minutes": e.duration_minutes, 
+                    "passing_score": e.passing_score, "is_active": e.is_active, 
+                    "questions_count": len(e.questions), "type": e.exam_type,
+                    "course_id": e.course_id, "module_id": e.module_id
+                } for e in course_exams
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error in list_all_exams: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/exams/questions-list")
