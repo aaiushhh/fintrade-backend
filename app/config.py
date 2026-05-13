@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "FItTrade LMS"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
-    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://localhost:8000,http://localhost:5173,https://fintrade-frontend-three.vercel.app"
 
     # ── Database ─────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://lms_user:lms_password@localhost:5432/lms_db"
