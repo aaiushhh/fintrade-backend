@@ -22,6 +22,16 @@ ALTER_STATEMENTS = [
     "ALTER TABLE course_exams ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ",
     "ALTER TABLE exam_answers ADD COLUMN IF NOT EXISTS is_correct BOOLEAN",
     "ALTER TABLE course_exam_answers ADD COLUMN IF NOT EXISTS is_correct BOOLEAN",
+
+    # --- exam_questions ---
+    "ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS category VARCHAR(100)",
+    "ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS negative_marks FLOAT DEFAULT 0.0",
+    "ALTER TABLE exam_questions ADD COLUMN IF NOT EXISTS explanation TEXT",
+
+    # --- course_exam_questions ---
+    "ALTER TABLE course_exam_questions ADD COLUMN IF NOT EXISTS category VARCHAR(100)",
+    "ALTER TABLE course_exam_questions ADD COLUMN IF NOT EXISTS negative_marks FLOAT DEFAULT 0.0",
+    "ALTER TABLE course_exam_questions ADD COLUMN IF NOT EXISTS explanation TEXT",
 ]
 
 CREATE_TABLES = [

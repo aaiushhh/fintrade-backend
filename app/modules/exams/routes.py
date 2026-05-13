@@ -30,81 +30,87 @@ async def list_all_exams(
     from app.modules.exams.models import CourseExam, CourseExamAttempt, EntranceExam, ExamAttempt, ExamViolation
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
+    import logging
+    logger = logging.getLogger(__name__)
 
-    # Fetch Entrance Exams + Student attempts
-    ent_res = await db.execute(
-        select(EntranceExam).options(selectinload(EntranceExam.questions))
-    )
-    entrance = ent_res.scalars().all()
+    try:
+        # Fetch Entrance Exams + Student attempts
+        ent_res = await db.execute(
+            select(EntranceExam).options(selectinload(EntranceExam.questions))
+        )
+        entrance = ent_res.scalars().all()
 
-    ent_attempts_res = await db.execute(
-        select(ExamAttempt).options(selectinload(ExamAttempt.result))
-        .where(ExamAttempt.user_id == current_user.id)
-    )
-    ent_attempts = ent_attempts_res.scalars().all()
-    ent_history = {}
-    for a in ent_attempts:
-        if a.exam_id not in ent_history: ent_history[a.exam_id] = []
-        ent_history[a.exam_id].append({
-            "id": a.id,
-            "submitted_at": a.submitted_at,
-            "percentage": a.result.percentage if a.result else 0,
-            "passed": a.result.passed if a.result else False,
-            "is_violation_wasted": False
-        })
+        ent_attempts_res = await db.execute(
+            select(ExamAttempt).options(selectinload(ExamAttempt.result))
+            .where(ExamAttempt.user_id == current_user.id)
+        )
+        ent_attempts = ent_attempts_res.scalars().all()
+        ent_history = {}
+        for a in ent_attempts:
+            if a.exam_id not in ent_history: ent_history[a.exam_id] = []
+            ent_history[a.exam_id].append({
+                "id": a.id,
+                "submitted_at": a.submitted_at,
+                "percentage": a.result.percentage if a.result else 0,
+                "passed": a.result.passed if a.result else False,
+                "is_violation_wasted": False
+            })
 
-    # Fetch Course Exams + Student attempts
-    course_res = await db.execute(
-        select(CourseExam).options(selectinload(CourseExam.questions))
-    )
-    course_exams = course_res.scalars().all()
+        # Fetch Course Exams + Student attempts
+        course_res = await db.execute(
+            select(CourseExam).options(selectinload(CourseExam.questions))
+        )
+        course_exams = course_res.scalars().all()
 
-    course_attempts_res = await db.execute(
-        select(CourseExamAttempt).options(selectinload(CourseExamAttempt.result), selectinload(CourseExamAttempt.violations))
-        .where(CourseExamAttempt.user_id == current_user.id)
-    )
-    course_attempts = course_attempts_res.scalars().all()
-    course_history = {}
-    for a in course_attempts:
-        if a.exam_id not in course_history: course_history[a.exam_id] = []
-        is_violation_wasted = any(v.violation_type == "tab_switch" for v in a.violations)
-        course_history[a.exam_id].append({
-            "id": a.id,
-            "submitted_at": a.submitted_at,
-            "percentage": a.result.percentage if a.result else 0,
-            "passed": a.result.passed if a.result else False,
-            "is_violation_wasted": is_violation_wasted
-        })
+        course_attempts_res = await db.execute(
+            select(CourseExamAttempt).options(selectinload(CourseExamAttempt.result), selectinload(CourseExamAttempt.violations))
+            .where(CourseExamAttempt.user_id == current_user.id)
+        )
+        course_attempts = course_attempts_res.scalars().all()
+        course_history = {}
+        for a in course_attempts:
+            if a.exam_id not in course_history: course_history[a.exam_id] = []
+            is_violation_wasted = any(v.violation_type == "tab_switch" for v in a.violations)
+            course_history[a.exam_id].append({
+                "id": a.id,
+                "submitted_at": a.submitted_at,
+                "percentage": a.result.percentage if a.result else 0,
+                "passed": a.result.passed if a.result else False,
+                "is_violation_wasted": is_violation_wasted
+            })
 
-    return {
-        "entrance_exams": [
-            {
-                "id": e.id,
-                "title": e.title,
-                "type": "entrance",
-                "questions_count": len(e.questions),
-                "duration_minutes": e.duration_minutes,
-                "passing_score": e.passing_score,
-                "is_active": e.is_active,
-                "course_id": e.course_id,
-                "attempts": ent_history.get(e.id, [])
-            } for e in entrance
-        ],
-        "course_exams": [
-            {
-                "id": e.id,
-                "title": e.title,
-                "type": e.exam_type,
-                "questions_count": len(e.questions),
-                "duration_minutes": e.duration_minutes,
-                "passing_score": e.passing_score,
-                "is_active": e.is_active,
-                "course_id": e.course_id,
-                "module_id": e.module_id,
-                "attempts": course_history.get(e.id, [])
-            } for e in course_exams
-        ]
-    }
+        return {
+            "entrance_exams": [
+                {
+                    "id": e.id,
+                    "title": e.title,
+                    "type": "entrance",
+                    "questions_count": len(e.questions),
+                    "duration_minutes": e.duration_minutes,
+                    "passing_score": e.passing_score,
+                    "is_active": e.is_active,
+                    "course_id": e.course_id,
+                    "attempts": ent_history.get(e.id, [])
+                } for e in entrance
+            ],
+            "course_exams": [
+                {
+                    "id": e.id,
+                    "title": e.title,
+                    "type": e.exam_type,
+                    "questions_count": len(e.questions),
+                    "duration_minutes": e.duration_minutes,
+                    "passing_score": e.passing_score,
+                    "is_active": e.is_active,
+                    "course_id": e.course_id,
+                    "module_id": e.module_id,
+                    "attempts": course_history.get(e.id, [])
+                } for e in course_exams
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error in student list_all_exams: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 
