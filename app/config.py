@@ -18,13 +18,24 @@ class Settings(BaseSettings):
 
     @property
     def async_database_url(self) -> str:
-        """Ensure the database URL uses the asyncpg driver.
-        Render/Neon provide postgresql:// but we need postgresql+asyncpg://"""
+        """Ensure the database URL uses the asyncpg driver and strip incompatible params.
+        Render/Neon provide postgresql:// but we need postgresql+asyncpg://
+        Also, asyncpg doesn't understand the sslmode query param."""
         url = self.DATABASE_URL
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgresql://") and "+asyncpg" not in url:
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+        # Strip sslmode if present
+        if "sslmode=" in url:
+            from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+            parsed = urlparse(url)
+            params = parse_qs(parsed.query)
+            params.pop("sslmode", None)
+            cleaned_query = urlencode(params, doseq=True)
+            url = urlunparse(parsed._replace(query=cleaned_query))
+            
         return url
 
     # ── JWT ──────────────────────────────────────────────────────────

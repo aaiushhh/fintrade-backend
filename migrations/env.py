@@ -25,7 +25,7 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url")
+    url = settings.async_database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -44,10 +44,14 @@ def do_run_migrations(connection):
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
-    connectable = create_async_engine(
-        config.get_main_option("sqlalchemy.url"),
-        poolclass=pool.NullPool,
-    )
+    from app.db.database import get_engine_args
+    args = get_engine_args()
+    args["poolclass"] = pool.NullPool
+    # Remove pool-related args not compatible with NullPool if any
+    args.pop("pool_size", None)
+    args.pop("max_overflow", None)
+    
+    connectable = create_async_engine(**args)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()

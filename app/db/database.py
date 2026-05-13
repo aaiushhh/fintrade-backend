@@ -7,10 +7,9 @@ from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
 
-def _build_engine():
-    """Build the async engine with SSL if needed (Neon / Vercel Postgres)."""
+def get_engine_args():
+    """Build the async engine args with SSL if needed (Neon / Vercel Postgres)."""
     url = settings.async_database_url
-
     connect_args = {}
 
     # Neon / Vercel Postgres require SSL
@@ -20,27 +19,17 @@ def _build_engine():
         ssl_ctx.verify_mode = ssl.CERT_NONE
         connect_args["ssl"] = ssl_ctx
 
-    # Strip sslmode from URL — asyncpg doesn't understand it as a query param
-    if "sslmode=" in url:
-        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
-        parsed = urlparse(url)
-        params = parse_qs(parsed.query)
-        params.pop("sslmode", None)
-        cleaned_query = urlencode(params, doseq=True)
-        url = urlunparse(parsed._replace(query=cleaned_query))
+    return {
+        "url": url,
+        "echo": settings.DEBUG,
+        "pool_size": 5,
+        "max_overflow": 3,
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+        "connect_args": connect_args,
+    }
 
-    return create_async_engine(
-        url,
-        echo=settings.DEBUG,
-        pool_size=5,
-        max_overflow=3,
-        pool_pre_ping=True,
-        pool_recycle=300,
-        connect_args=connect_args,
-    )
-
-
-engine = _build_engine()
+engine = create_async_engine(**get_engine_args())
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
